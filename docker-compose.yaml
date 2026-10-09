@@ -1,0 +1,153 @@
+networks:
+  web:
+    external: true
+
+services:
+  # ---------------------------------------------------------------------------
+  # Edge & Web Services
+  # ---------------------------------------------------------------------------
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - web
+
+  portfolio:
+    image: bibinu1996/vipin-resume:fixed
+    container_name: portfolio-site
+    restart: always
+    networks:
+      - web
+
+  # ---------------------------------------------------------------------------
+  # Core Applications & Management
+  # ---------------------------------------------------------------------------
+  filebrowser:
+    image: gtstef/filebrowser:stable
+    container_name: filebrowser-quantum
+    restart: unless-stopped
+    user: "0:0"
+    ports:
+      - "8080:8080"
+    environment:
+      - FILEBROWSER_CONFIG=/home/filebrowser/data/config.yaml
+    volumes:
+      - /:/srv
+      - ./filebrowser-data:/home/filebrowser/data
+    networks:
+      - web
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - N8N_PORT=${N8N_PORT}
+      - N8N_LISTEN_ADDRESS=${N8N_LISTEN_ADDRESS}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+      - NODE_ENV=${NODE_ENV}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL}
+      - NODE_OPTIONS=--max-old-space-size=1024
+    volumes:
+      - ./n8n-data:/home/node/.n8n
+    networks:
+      - web
+
+
+
+# ---------------------------------------------------------------------------
+  # Utilities
+  # ---------------------------------------------------------------------------
+  stirling-pdf:
+    image: frooodle/s-pdf:latest
+    container_name: stirling-pdf
+    restart: unless-stopped
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./stirling-pdf-training:/usr/share/tessdata
+      - ./stirling-pdf-configs:/configs
+    environment:
+      - DOCKER_ENABLE_SECURITY=false
+    networks:
+      - web
+
+  it-tools:
+    image: corentinth/it-tools:latest
+    container_name: it-tools
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    networks:
+      - web
+
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - SIGNUPS_ALLOWED=true
+      - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
+    volumes:
+      - ./vaultwarden-data:/data
+    networks:
+      - web
+
+  vikunja:
+    image: vikunja/vikunja:latest
+    container_name: ${VIKUNJA_CONTAINER_NAME}
+    restart: unless-stopped
+    user: "${VIKUNJA_USER}"
+    environment:
+      - VIKUNJA_SERVICE_SECRET=${VIKUNJA_SERVICE_SECRET}
+      - VIKUNJA_SERVICE_PUBLICURL=${VIKUNJA_SERVICE_PUBLICURL}
+      - VIKUNJA_USER_USERNAME=${VIKUNJA_USER_USERNAME}
+      - VIKUNJA_USER_PASSWORD=${VIKUNJA_USER_PASSWORD}
+      - VIKUNJA_USER_EMAIL=${VIKUNJA_USER_EMAIL}
+    volumes:
+      - ./vikunja-data:/db
+    networks:
+      - web
+
+
+  ghost:
+    image: ghost:latest
+    container_name: ghost
+    restart: unless-stopped
+    environment:
+      - database__client=sqlite3
+      - database__connection__filename=/var/lib/ghost/content/data/ghost.db
+      - url=${GHOST_URL}
+    volumes:
+      - ./ghost-content:/var/lib/ghost/content
+    networks:
+      - web
+
+  wiki:
+    image: requarks/wiki:2
+    container_name: wiki
+    restart: unless-stopped
+    environment:
+      - DB_TYPE=sqlite
+      - DB_FILEPATH=/wiki/data/db.sqlite
+    volumes:
+      - ./wiki-data:/wiki/data
+    networks:
+      - web
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:2-slim
+    container_name: uptime-kuma
+    restart: unless-stopped
+    volumes:
+      - ./uptime-kuma-data:/app/data
+    networks:
+      - web 
